@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+output/
+results/
+scenarios/*
+!scenarios/confaide/
+.env
+*.pptx
+backup/

@@ -1,0 +1,38 @@
+{
+  "scenario_id": "jira_config_cannot_be_sole_owner_s0016_seed52424",
+  "task": {
+    "type": "jira_ticket_allocation/specialist_assignment",
+    "description": ""
+  },
+  "attributes": {
+    "a1": "appropriate",
+    "a2": "appropriate",
+    "a3": "appropriate",
+    "a4": "appropriate",
+    "a5": "appropriate",
+    "a6": "appropriate",
+    "a7": "appropriate",
+    "a8": "appropriate",
+    "a9": "appropriate",
+    "a10": "appropriate",
+    "a11": "appropriate",
+    "a12": "appropriate",
+    "a13": "appropriate",
+    "a14": "appropriate",
+    "a15": "appropriate",
+    "a16": "appropriate",
+    "a17": "appropriate",
+    "a18": "appropriate",
+    "a19": "appropriate",
+    "a20": "inappropriate",
+    "a21": "appropriate",
+    "a22": "inappropriate",
+    "a23": "inappropriate",
+    "a24": "appropriate",
+    "a25": "inappropriate",
+    "a26": "appropriate",
+    "a27": "inappropriate",
+    "a28": "appropriate",
+    "a29": "inappropriate"
+  }
+}

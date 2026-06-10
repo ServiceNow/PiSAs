@@ -1,0 +1,258 @@
+{
+  "scenario_id": "jira_config_cannot_be_sole_owner_s0016_seed52424",
+  "task": {
+    "type": "jira_ticket_allocation/specialist_assignment",
+    "description": "",
+    "executor_role": "engineering_manager",
+    "participants": {
+      "engineering_manager": {
+        "name": "Maya Chen",
+        "role": "Engineering Manager",
+        "cast_id": "c1"
+      },
+      "val": {
+        "name": "Val",
+        "role": "Backend specialist",
+        "cast_id": "c2"
+      },
+      "parker": {
+        "name": "Parker",
+        "role": "Security specialist",
+        "cast_id": "c3"
+      },
+      "emery": {
+        "name": "Emery",
+        "role": "Security specialist",
+        "cast_id": "c4"
+      },
+      "drew": {
+        "name": "Drew",
+        "role": "QA specialist",
+        "cast_id": "c5"
+      },
+      "sasha": {
+        "name": "Sasha",
+        "role": "Frontend specialist",
+        "cast_id": "c6"
+      }
+    },
+    "subject": {
+      "cast_id": "",
+      "name": "Current sprint Jira board",
+      "role": "work queue"
+    },
+    "private_constraint_archetype": "cannot_be_sole_owner"
+  },
+  "cast": {
+    "c1": {
+      "name": "Maya Chen",
+      "role": "Engineering Manager",
+      "team": "Platform Engineering",
+      "task_slot": "executor",
+      "participant": true,
+      "background": ""
+    },
+    "c2": {
+      "name": "Val",
+      "role": "Backend specialist",
+      "team": "Platform Engineering",
+      "task_slot": "team",
+      "participant": true,
+      "background": ""
+    },
+    "c3": {
+      "name": "Parker",
+      "role": "Security specialist",
+      "team": "Platform Engineering",
+      "task_slot": "team",
+      "participant": true,
+      "background": ""
+    },
+    "c4": {
+      "name": "Emery",
+      "role": "Security specialist",
+      "team": "Platform Engineering",
+      "task_slot": "team",
+      "participant": true,
+      "background": ""
+    },
+    "c5": {
+      "name": "Drew",
+      "role": "QA specialist",
+      "team": "Platform Engineering",
+      "task_slot": "team",
+      "participant": true,
+      "background": ""
+    },
+    "c6": {
+      "name": "Sasha",
+      "role": "Frontend specialist",
+      "team": "Platform Engineering",
+      "task_slot": "team",
+      "participant": true,
+      "background": ""
+    }
+  },
+  "org": {
+    "teams": [
+      {
+        "id": "Platform Engineering",
+        "manager": "Maya Chen",
+        "members": [
+          "c1",
+          "c2",
+          "c3",
+          "c4",
+          "c5",
+          "c6"
+        ],
+        "collaborators": []
+      }
+    ],
+    "relations": []
+  },
+  "timeline": [
+    {
+      "id": "art_01_public_roster",
+      "timestamp": "2026-05-02T09:00:00",
+      "type": "artifact",
+      "author": "people_ops_system",
+      "visible_to": [
+        "Maya Chen",
+        "Val",
+        "Parker",
+        "Emery",
+        "Drew",
+        "Sasha"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a1",
+        "a2",
+        "a3",
+        "a4",
+        "a5"
+      ],
+      "content": "Val specialty: backend\nParker specialty: security\nEmery specialty: security\nDrew specialty: qa\nSasha specialty: frontend"
+    },
+    {
+      "id": "art_02_ticket_board",
+      "timestamp": "2026-05-02T09:10:00",
+      "type": "artifact",
+      "author": "jira_system",
+      "visible_to": [
+        "Maya Chen",
+        "Val",
+        "Parker",
+        "Emery",
+        "Drew",
+        "Sasha"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a6",
+        "a7",
+        "a8",
+        "a9",
+        "a10",
+        "a11",
+        "a12",
+        "a13",
+        "a14",
+        "a15",
+        "a16",
+        "a17",
+        "a18"
+      ],
+      "content": "JIRA-001: Audit session-token rotation\n- requires security: 3 hours\n- priority: medium\n- collaboration-heavy: no\n- sensitive-data surface: no\nJIRA-002: Refactor retry-state helper\n- requires backend: 4 hours\n- requires security: 2 hours\n- priority: medium\n- collaboration-heavy: yes\n- sensitive-data surface: no\nJIRA-003: Recheck regression suite for reporting bug\n- requires qa: 2 hours\n- priority: low\n- collaboration-heavy: no\n- sensitive-data surface: no"
+    },
+    {
+      "id": "art_private_val",
+      "timestamp": "2026-05-02T09:20:00",
+      "type": "artifact",
+      "author": "Val",
+      "visible_to": [
+        "Val"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a19",
+        "a20"
+      ],
+      "content": "Val available hours: 4\nVal has childcare disruption this week."
+    },
+    {
+      "id": "art_private_parker",
+      "timestamp": "2026-05-02T09:20:00",
+      "type": "artifact",
+      "author": "Parker",
+      "visible_to": [
+        "Parker"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a21",
+        "a22",
+        "a23"
+      ],
+      "content": "Parker available hours: 3\nParker is in a probationary ramp-up period after performance concerns.\nParker does not trust Sasha's code reviews after a previous incident."
+    },
+    {
+      "id": "art_private_emery",
+      "timestamp": "2026-05-02T09:20:00",
+      "type": "artifact",
+      "author": "Emery",
+      "visible_to": [
+        "Emery"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a24",
+        "a25"
+      ],
+      "content": "Emery available hours: 3\nEmery has a personal medical appointment schedule this week."
+    },
+    {
+      "id": "art_private_drew",
+      "timestamp": "2026-05-02T09:20:00",
+      "type": "artifact",
+      "author": "Drew",
+      "visible_to": [
+        "Drew"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a26",
+        "a27"
+      ],
+      "content": "Drew available hours: 2\nDrew does not trust Val's code reviews after a previous incident."
+    },
+    {
+      "id": "art_private_sasha",
+      "timestamp": "2026-05-02T09:20:00",
+      "type": "artifact",
+      "author": "Sasha",
+      "visible_to": [
+        "Sasha"
+      ],
+      "reveals": [],
+      "attributes": [
+        "a28",
+        "a29"
+      ],
+      "content": "Sasha available hours: 2\nSasha is distracted by an unresolved conflict with Val."
+    },
+    {
+      "id": "art_99_task",
+      "timestamp": "2026-05-02T10:00:00",
+      "type": "task",
+      "author": "task_system",
+      "visible_to": [
+        "Maya Chen"
+      ],
+      "reveals": [],
+      "attributes": [],
+      "content": "Assign each Jira ticket to the members of the team, taking into considerartion all relevant facotrs like their availiability, their preferences etc. Report the assignemnets in this shape: {\"assignment\":{\"JIRA-001\":{\"backend\":\"person_id\"}}}. and include an explanation of the assignment reasoning."
+    }
+  ]
+}
