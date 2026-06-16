@@ -42,6 +42,29 @@ _DATA_ROOT = os.path.join(os.path.dirname(__file__), "data")
 ARCH_LABELS = {"decentralized": "Decentralized", "single": "Single", "centralized": "Centralized"}
 W = 72
 
+# Hugging Face dataset holding the full PiSAs benchmark. Downloaded by default (to
+# the HF cache) when no local scenario/folder is given. Private during review; the
+# repo id stays the same once it goes public.
+PISAS_HF_REPO = "ServiceNow/PiSAs"
+
+_HF_AUTH_HELP = (
+    "Can't access the private PiSAs dataset on Hugging Face — no valid HF token found.\n"
+    "The benchmark is private, so you need a Hugging Face token with read access.\n"
+    "  1. Create a read token:  https://huggingface.co/settings/tokens\n"
+    "  2. Make it available, either:\n"
+    "       huggingface-cli login          (paste the token), or\n"
+    "       export HF_TOKEN=hf_xxxxx        (e.g. add to ~/.bashrc)\n"
+    "  3. Re-run.\n"
+    "Or skip Hugging Face and use local data:  --scenarios-folder <path>  (or -d <scenario>)"
+)
+
+
+def _require(value, message):
+    """Exit with a clear message if a required value (e.g. an API key) is missing."""
+    if not value:
+        print(f"ERROR: {message}", file=sys.stderr)
+        sys.exit(1)
+
 
 def _resolve_scenario(scenario_arg):
     """Accept a scenario folder path or a name under data/; return (id, abs_dir)."""
@@ -76,6 +99,19 @@ def _query_key_usage(api_key: str):
             return {"usage": data.get("usage", 0.0), "limit": data.get("limit")}
     except Exception:
         return None
+
+
+# ── Hugging Face benchmark download ───────────────────────────────────────────
+
+def _download_benchmark() -> str:
+    """Download the full PiSAs benchmark from Hugging Face (cached) and return its path."""
+    from huggingface_hub import snapshot_download, get_token
+    _require(get_token(), _HF_AUTH_HELP)
+    log.info("  Downloading PiSAs benchmark from Hugging Face…")
+    try:
+        return snapshot_download(PISAS_HF_REPO, repo_type="dataset")
+    except Exception as e:
+        _require(False, f"{_HF_AUTH_HELP}\n  Underlying error: {e}")
 
 
 # ── Single-scenario orchestration ─────────────────────────────────────────────
@@ -399,7 +435,9 @@ def run_batch(args, api_key):
 def build_parser():
     p = argparse.ArgumentParser(
         description="PiSAs pipeline runner — orchestration only, no judging. "
-                    "Single mode (-d/-o) or batch mode (--scenarios-folder/--results-path).",
+                    "By default downloads the PiSAs benchmark from Hugging Face and runs one task "
+                    "(--task, default JIRA_allocation; needs an HF token). Use -d/-o for a single "
+                    "local scenario, or --scenarios-folder/--results-path for a local batch.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # Architecture + model config (shared).
@@ -419,6 +457,10 @@ def build_parser():
     p.add_argument("--privacy-level", choices=["None", "Low", "Medium", "High"], default="High")
     p.add_argument("--api-key", default=None, metavar="KEY",
                    help="OpenRouter API key (overrides OPENROUTER_API_KEY).")
+    # Hugging Face benchmark (used when no local scenario/folder is given).
+    p.add_argument("--task", default="JIRA_allocation",
+                   choices=["JIRA_allocation", "meeting_allocation", "severity_classification"],
+                   help="Which PiSAs task to download & run from Hugging Face.")
     # Single mode.
     p.add_argument("-d", "--scenario", default=None, metavar="FOLDER",
                    help="[single] Scenario folder under data/, or a direct path.")
@@ -439,9 +481,18 @@ def build_parser():
 def main():
     args = build_parser().parse_args()
     api_key = args.api_key or os.getenv("OPENROUTER_API_KEY", "")
-    if not api_key:
-        print("ERROR: No API key. Set OPENROUTER_API_KEY or pass --api-key.", file=sys.stderr)
-        sys.exit(1)
+    _require(api_key, "No API key. Set OPENROUTER_API_KEY or pass --api-key.")
+
+    # Default data source: the chosen --task of the PiSAs benchmark from Hugging Face.
+    # Skipped when the user points at local data with -d/--scenario or --scenarios-folder.
+    if not (args.scenario or args.scenarios_folder):
+        benchmark_root = Path(_download_benchmark())
+        task_dir = benchmark_root / args.task
+        _require(task_dir.is_dir(), f"Task {args.task!r} not found in the benchmark at {benchmark_root}.")
+        args.scenarios_folder = str(task_dir)
+        args.results_path = args.results_path or "results/PiSAs"
+        run_batch(args, api_key)
+        return
 
     is_batch = bool(args.scenarios_folder or args.results_path)
     if is_batch:

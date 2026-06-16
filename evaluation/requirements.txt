@@ -2,3 +2,4 @@
 litellm==1.83.4
 pandas==2.3.3
 streamlit==1.56.0
+huggingface_hub==1.16.1

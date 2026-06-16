@@ -16,10 +16,18 @@ Two entry points share the same core (`agents.py` + `judges.py`):
 ```bash
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
+export OPENAI_API_KEY=your_key_here   # only for native OpenAI models (gpt-5, gpt-5.5, o4-mini)
+export HF_TOKEN=your_hf_token_here    # only to download the benchmark from Hugging Face
 ```
 
-Every LLM call goes through [OpenRouter](https://openrouter.ai) (via litellm), so any OpenRouter
-model id works for agents, judges, and verifiers. Run all commands from the repository root.
+Model calls go through [OpenRouter](https://openrouter.ai) by default (via litellm), so any
+OpenRouter model id works for agents, judges, and verifiers. A small registry routes a few models
+elsewhere: `gpt-5`, `gpt-5.5`, and `o4-mini` call the OpenAI API directly (using `OPENAI_API_KEY`),
+and `gpt-oss-120b` runs against a local server. Run all commands from the repository root.
+
+The benchmark scenarios are hosted as a Hugging Face dataset and downloaded automatically (see
+[Run the CLI](#run-the-cli)); `HF_TOKEN` is needed only for that download — not for local runs.
+Get a read token at <https://huggingface.co/settings/tokens> (or run `huggingface-cli login`).
 
 ---
 
@@ -71,8 +79,21 @@ sidebar, then hit **▶ Run Agent Task**. The API key auto-fills from `$OPENROUT
 `run_pipeline.py` orchestrates a run → `pipeline_<scenario>.json`; `run_evaluation.py` judges it →
 `evaluation_<scenario>.json` beside it.
 
+**By default — with no `-d` or `--scenarios-folder` — the runner downloads the PiSAs benchmark from
+Hugging Face** (cached locally; needs `HF_TOKEN`) and runs one task, selected by `--task`
+(default `JIRA_allocation`; also `meeting_allocation`, `severity_classification`), writing under
+`results/PiSAs/<task>/<scenario>/`:
+
 ```bash
-# Single scenario
+python run_pipeline.py -s centralized --agent-llm anthropic/claude-sonnet-4-6 --private-memory --shared-memory
+python run_pipeline.py -s centralized --agent-llm anthropic/claude-sonnet-4-6 --task meeting_allocation
+```
+
+To run **local** scenarios instead, pass an explicit path with `-d` (single) or `--scenarios-folder`
+(batch):
+
+```bash
+# Single local scenario
 python run_pipeline.py -s centralized --agent-llm anthropic/claude-sonnet-4-6 \
     --private-memory --shared-memory -d data/<scenario> -o results/run1
 python run_evaluation.py -d data/<scenario> -o results/run1 --agent-audit --memory-audit
@@ -127,7 +148,9 @@ union** while completeness and utility take the **per-run mean**.
 
 ## Data & outputs
 
-Each scenario folder under `data/` holds four files:
+The full benchmark (all task families and their scenarios) lives in the PiSAs Hugging Face dataset
+and is downloaded on demand. The local `data/` folder keeps a single sample scenario so the demo and
+local runs work out of the box. Either way, each scenario folder holds four files:
 
 | File | Contents |
 |---|---|
