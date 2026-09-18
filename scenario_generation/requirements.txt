@@ -1,3 +1,9 @@
-# Scenario generation needs nothing but the standard library, except for the
-# optional configuration-analysis workbook (skip it with --no-analysis-xlsx).
+# generate_scenarios.py needs nothing but the standard library, except for the optional
+# configuration-analysis workbook (skip it with --no-analysis-xlsx).
 openpyxl>=3.1
+
+# enriched_pipeline.py calls an OpenAI-compatible endpoint over HTTP.
+requests>=2.31
+
+# notebooks/Severity_Classification.ipynb progress bars
+tqdm>=4.66

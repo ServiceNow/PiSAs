@@ -1904,6 +1904,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     seed = load_json(args.seed)
+    # The repository ships two seed formats. Say so plainly rather than failing with a
+    # list of missing keys when someone points this generator at the other one.
+    if "value_profiles" in seed and "task_family_id" not in seed:
+        print(f"ERROR: {args.seed} is an enriched seed (the format enriched_pipeline.py reads), "
+              f"not a task-family seed.\n"
+              f"  Try:  python enriched_pipeline.py {args.seed} -o ./output", file=sys.stderr)
+        return 2
     personal_path = args.personal_context or (Path(__file__).resolve().parent / "personal_context_library.json")
     if not personal_path.exists():
         print(f"ERROR: personal-context library not found: {personal_path}", file=sys.stderr)

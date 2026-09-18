@@ -17,6 +17,11 @@ that must not travel. Each piece of information carries **two annotations** — 
 *appropriate* for this task, and *who* may see it — so a run can be scored on getting the decision
 right and on what it let through, for any system design.
 
+<p align="center">
+  <img src="docs/assets/problem-setting.png" alt="A team shares one agentic system. To assign JIRA tickets for Maya, it must gather the appropriate facts (green) without pulling in inappropriate ones (red) or spilling facts to users who may not see them." width="100%">
+</p>
+<p align="center"><sub>Figure 1 from the paper: a team shares one agentic system, and attributes should flow according to contextual-integrity norms.</sub></p>
+
 **Contents** ·
 [The benchmark](#the-benchmark) ·
 [Tasks](#tasks) ·
@@ -75,16 +80,22 @@ The dataset lives on Hugging Face as
 | `outgoing_museum_loan` | Museum registrar | release a loan shipment, or name the unresolved check | 30 |
 | `special_event_permit_readiness` | Municipal permitting | decide whether a special event is ready | 30 |
 
-The paper evaluates the first three (85 scenarios), which were hand-authored. The other six were
-built later from **task seeds** grounded in real regulations and institutional processes — FAA Part
-107, PLOS submission policy, City of Toronto permitting, hospital discharge criteria — and their
-seeds are in this repository, so you can regenerate them or write your own
+The paper evaluates the first three (85 scenarios), which were built by hand — their generators are
+in [`scenario_generation/notebooks/`](scenario_generation/notebooks). The other six came later,
+from **task seeds** grounded in real regulations and institutional processes: FAA Part 107, PLOS
+submission policy, City of Toronto permitting, hospital discharge criteria. Every seed is in this
+repository, so any task here can be regenerated, and a new one written the same way
 ([section 2](#2-write-your-own-seed)).
 
 > **Note.** The visibility labels of the three original tasks were re-derived after the paper, so
 > numbers computed on the current release will not match Table 2 exactly.
 
 ## How a run works
+
+<p align="center">
+  <img src="docs/assets/systems.png" alt="Task execution with its leak surfaces, and the decentralized and centralized agent topologies." width="100%">
+</p>
+<p align="center"><sub>Figure 2 from the paper: the leak surfaces (a), and the decentralized (b) and centralized (c) systems.</sub></p>
 
 Whatever the system, the executor's task is solved in **two stages**: an *information-gathering*
 stage that ends in a **gathered-info summary**, and a *decision* stage that sees only that summary.
@@ -300,8 +311,10 @@ turns on, how those facts can be phrased, the decoys, the personal context, and 
 to draw. The generator expands it into scenario bundles — deterministically, with no model calls
 and no API key.
 
-The six seeds behind the released tasks are in
-[`scenario_generation/seeds/`](scenario_generation/seeds). Start from the closest one:
+The seeds behind the released tasks are in
+[`scenario_generation/seeds/`](scenario_generation/seeds) — one folder per task, and the
+[generation README](scenario_generation/README.md) says which generator each one feeds. Start
+from the closest one:
 
 ```text
 scenario_generation/seeds/uas_flight_readiness/
@@ -553,11 +566,11 @@ Two differences from the paper's own runs, both deliberate and both revertible:
 │   ├── launch_evaluation.sh
 │   └── data/                        # two sample scenarios for offline smoke tests
 └── scenario_generation/
-    ├── README.md                    # seed format, generation, visibility voting
-    ├── generate_scenarios.py        # seed JSON → scenario bundles
-    ├── seeds/                       # the six seeds behind the released tasks
-    ├── JIRA_Allocation.ipynb        # hand-authored generator for the JIRA task
-    └── Meeting_Allocation.ipynb     # hand-authored generator for the meeting task
+    ├── README.md                    # which generator built which task, seed format, visibility voting
+    ├── generate_scenarios.py        # task-family seed → scenario bundles (six tasks)
+    ├── enriched_pipeline.py         # enriched seed    → scenario bundles (severity_classification)
+    ├── seeds/                       # every published seed, one folder per task
+    └── notebooks/                   # annotated walkthroughs of the three hand-built tasks
 ```
 
 ## Dataset card and licence

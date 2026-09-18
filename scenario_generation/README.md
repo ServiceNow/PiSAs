@@ -1,35 +1,58 @@
 # Scenario generation
 
-Two ways to build PiSAs scenarios:
+Everything that produced a PiSAs task lives here: two generators, the seeds they read, and
+the notebooks that walk through how the earlier tasks were built.
 
-| | What it is | Use it when |
+```text
+scenario_generation/
+├── generate_scenarios.py       # task-family seed → scenario bundles   (the six newer tasks)
+├── enriched_pipeline.py        # enriched seed    → scenario bundles   (severity_classification)
+├── personal_context_library.json
+├── seeds/                      # every published seed, one folder per task
+└── notebooks/                  # annotated walkthroughs of the three hand-built tasks
+```
+
+## Which generator produced which task
+
+| Task | Seed | Generator |
 |---|---|---|
-| **`generate_scenarios.py`** | Expands one **task seed** into a folder of scenario bundles | You want a new task, or many scenarios of one task |
-| **`JIRA_Allocation.ipynb`, `Meeting_Allocation.ipynb`** | The hand-authored notebooks behind two of the original tasks | You want to see how the first tasks were written |
+| `inpatient_discharge` | `seeds/inpatient_discharge/` | `generate_scenarios.py` |
+| `thesis_readiness` | `seeds/thesis_readiness/` | `generate_scenarios.py` |
+| `manuscript_submission` | `seeds/manuscript_submission/` | `generate_scenarios.py` |
+| `uas_flight_readiness` | `seeds/uas_flight_readiness/` | `generate_scenarios.py` |
+| `outgoing_museum_loan` | `seeds/outgoing_museum_loan/` | `generate_scenarios.py` |
+| `special_event_permit_readiness` | `seeds/special_event_permit_readiness/` | `generate_scenarios.py` |
+| `severity_classification` | `seeds/severity_classification/` | `enriched_pipeline.py` — walkthrough in `notebooks/Severity_Classification.ipynb` |
+| `JIRA_allocation` | in-notebook config | `notebooks/JIRA_Allocation.ipynb` |
+| `meeting_allocation` | in-notebook config | `notebooks/Meeting_Allocation.ipynb` |
 
-The six seeds under [`seeds/`](seeds) are the ones the released tasks were generated from.
+The two seed formats are not interchangeable — a task-family seed describes a whole family and
+is expanded deterministically, an enriched seed describes one task and its value profiles and is
+materialized by an LLM. Point either generator at the other's seed and it will say so.
+
+```bash
+pip install -r requirements.txt
+```
 
 ---
 
-## From a seed to scenarios
+## Task-family seeds → scenarios
 
 ```bash
-pip install openpyxl      # only for the analysis workbook; --no-analysis-xlsx skips it
-
 python generate_scenarios.py \
     --seed seeds/uas_flight_readiness/seed.json \
     --personal-context seeds/uas_flight_readiness/personal_context_library.json \
     --out-root generated/uas_flight_readiness
 ```
 
-That writes `generated/uas_flight_readiness/scenario_01…30/`, each holding the four files
-the harness reads, plus a `*_configuration_analysis.xlsx` workbook listing every valid
-evidence configuration, its oracle outcome, its minimal sufficient evidence sets and
-whether it was eligible for sampling.
+That writes `generated/uas_flight_readiness/scenario_01…30/`, each holding the four files the
+harness reads, plus a `*_configuration_analysis.xlsx` workbook listing every valid evidence
+configuration, its oracle outcome, its minimal sufficient evidence sets and whether it was
+eligible for sampling.
 
-Generation is deterministic: the same seed, `--random-seed` and options always produce the
-same scenarios. Nothing is model-generated — every sentence comes from the seed's own
-phrasings — so this step needs no API key and costs nothing.
+Generation is deterministic: the same seed, `--random-seed` and options always produce the same
+scenarios. Nothing is model-generated — every sentence comes from the seed's own phrasings — so
+this step needs no API key and costs nothing.
 
 Check a seed without generating anything:
 
@@ -37,10 +60,13 @@ Check a seed without generating anything:
 python generate_scenarios.py --seed <seed.json> --personal-context <library.json> --health-only
 ```
 
+This prints every valid evidence configuration, its oracle outcome, whether any configuration
+matches two decision rules, the outcome quotas it can actually fill, and any structural error.
+
 ### Reproducing a released task
 
-The released bundles carry release names rather than the seed's internal family id. Pass
-both names to reproduce them:
+The released bundles carry release names rather than the seed's internal family id. Pass both
+names to reproduce them:
 
 ```bash
 python generate_scenarios.py \
@@ -50,42 +76,62 @@ python generate_scenarios.py \
     --id-prefix part107_flight_readiness_triage --task-type uas_flight_readiness
 ```
 
-This reproduces `scenario.json`, `utility.json` and `appropriateness.json` of the released
-task exactly. `visibility.json` comes out at its deterministic baseline (each fact visible
-to its holder, and required evidence also to the executor) until you run the visibility
-vote below, which is what produced the released labels.
+This reproduces `scenario.json`, `utility.json` and `appropriateness.json` of the released task
+exactly. `visibility.json` comes out at its deterministic baseline (each fact visible to its
+holder, and required evidence also to the executor) until you run the visibility vote below,
+which is what produced the released labels.
 
 `--id-prefix` changes only the ids written into the bundles, never which scenarios are
 generated — those are keyed to the seed's `task_family_id`.
 
-## Labelling visibility
+### Labelling visibility
 
 Who may see a fact is not something the seed can state for every pair of people, so the
-remaining pairs are labelled by a vote: for each (attribute, person) pair, the same
-question is put three times to a model under three different privacy attitudes, and the
-majority wins.
+remaining pairs are labelled by a vote: for each (attribute, person) pair, the same question is
+put three times to a model under three different privacy attitudes, and the majority wins.
 
 ```bash
 python generate_scenarios.py --visibility-only \
     --out-root generated/uas_flight_readiness \
     --visibility-model google/gemma-3-27b-it \
     --visibility-base-url http://localhost:8000/v1 \
-    --visibility-api-key-env OPENAI_API_KEY \
     --visibility-workers 24
 ```
 
-`--visibility-base-url` takes any OpenAI-compatible `/chat/completions` endpoint, and
-several comma-separated URLs are used round-robin. For a local server that wants no
-auth header, pass `--visibility-api-key-env ""`.
+`--visibility-base-url` takes any OpenAI-compatible `/chat/completions` endpoint, and several
+comma-separated URLs are used round-robin. For a server that wants no auth header, pass
+`--visibility-api-key-env ""`. Budget roughly 500 calls per scenario.
 
-This step is the expensive one: three calls per unresolved (attribute, person) pair, which
-is roughly 500 calls per scenario and ~15k for a 30-scenario task. The released labels were
-produced with `google/gemma-3-27b-it`; agreement with human annotators is reported in the
-paper's appendix.
+## Enriched seeds → scenarios
+
+`enriched_pipeline.py` runs three stages — assign the cast, have a model write each artifact's
+text from a blueprint, then assemble the four files — and writes one bundle per value profile in
+the seed:
+
+```bash
+export OPENROUTER_API_KEY=...
+python enriched_pipeline.py seeds/severity_classification/seed.json -o ./output
+python enriched_pipeline.py seeds/severity_classification/seed.json -o ./output --profile all --model openai/gpt-4o
+```
+
+`--api-base` points it at any other OpenAI-compatible server. Cast assignment is deterministic
+given `--seed-random`; the artifact text is not, because a model writes it.
+
+`notebooks/Severity_Classification.ipynb` walks through the same three stages cell by cell,
+including the critic panel that votes on candidate trap phrasings, if you want to see or change
+how a stage works before running the CLI.
+
+## The notebook generators
+
+`notebooks/JIRA_Allocation.ipynb` and `notebooks/Meeting_Allocation.ipynb` produced the two
+hand-built tasks. They are self-contained: the configuration lives in an in-notebook `GEN_CONFIG`
+dict rather than a seed file, and both are *backward-built* — plant a public ambiguity first,
+then add the decision-critical private constraint that resolves it. They are the clearest place
+to see how a constraint, its sanitized form and its visibility annotation line up.
 
 ## Writing your own seed
 
-Start from the closest of the six published seeds and edit it — they are the reference
+Start from the closest of the published task-family seeds and edit it — they are the reference
 implementation, and `--health-only` will tell you what is wrong. A seed is one JSON file:
 
 | Key | What it holds |
@@ -102,32 +148,32 @@ implementation, and `--health-only` will tell you what is wrong. A seed is one J
 | `timeline` | How artifacts are laid out in time |
 
 Each **evidence variable** has a holder and a set of **states**. Each state carries the
-`canonical_fact` that state means, an `evaluation_probe`/`evaluation_target` pair used to
-score it, and several **surface realizations** — the ways a person might actually say it:
+`canonical_fact` that state means, an `evaluation_probe`/`evaluation_target` pair used to score
+it, and several **surface realizations** — the ways a person might actually say it:
 
 - a `clean` realization says the fact and nothing more;
-- a `privacy_entangled` realization fuses the fact with a private detail that the decision
-  must not use, and carries both that `embedded_inappropriate_detail` and the
-  `clean_rewrite` — the sanitized form that says the same usable thing without it.
+- a `privacy_entangled` realization fuses the fact with a private detail that the decision must
+  not use, and carries both that `embedded_inappropriate_detail` and the `clean_rewrite` — the
+  sanitized form that says the same usable thing without it.
 
-That pairing is what makes the benchmark measurable: the clean rewrite is what a system
-*should* surface, the embedded detail is what it must not.
+That pairing is what makes the benchmark measurable: the clean rewrite is what a system *should*
+surface, the embedded detail is what it must not.
 
-`generation_plan.invalid_configurations` is how a task avoids scenarios where two
-independent checks both fail — list the pairs that cannot co-occur, and every generated
-scenario has exactly one reason for its outcome.
+`generation_plan.invalid_configurations` is how a task avoids scenarios where two independent
+checks both fail — list the pairs that cannot co-occur, and every generated scenario has exactly
+one reason for its outcome.
 
-The **personal-context library** is a separate file of generic private facts about cast
-members ("{person} is going through a divorce"). They are deliberately irrelevant to the
-decision — that is what separates them from decoys — and a system should never let them
-reach the task.
+The **personal-context library** is a separate file of generic private facts about cast members
+("{person} is going through a divorce"). They are deliberately irrelevant to the decision — that
+is what separates them from decoys — and a system should never let them reach the task.
 
 ## Then evaluate
 
 ```bash
 cd ../evaluation
-python run_pipeline.py --scenarios-folder ../scenario_generation/generated/uas_flight_readiness \
-    --results-path results/mine -s centralized --agent-llm openai/gpt-5.5
+python validate_scenarios.py ../scenario_generation/generated/uas_flight_readiness
+python run_benchmark.py --scenarios-folder ../scenario_generation/generated/uas_flight_readiness \
+    --agent-llm openai/gpt-5.5
 ```
 
-See the [main README](../README.md#bring-your-own-scenarios) for the full loop.
+See the [main README](../README.md#4-evaluate-your-own-scenarios) for the full loop.
