@@ -17,7 +17,6 @@ Two entry points share the same core (`agents.py` + `judges.py`):
 pip install -r requirements.txt
 export OPENROUTER_API_KEY=your_key_here
 export OPENAI_API_KEY=your_key_here   # only for native OpenAI models (gpt-5, gpt-5.5, o4-mini)
-export HF_TOKEN=your_hf_token_here    # only to download the benchmark from Hugging Face
 ```
 
 Model calls go through [OpenRouter](https://openrouter.ai) by default (via litellm), so any
@@ -25,9 +24,8 @@ OpenRouter model id works for agents, judges, and verifiers. A small registry ro
 elsewhere: `gpt-5`, `gpt-5.5`, and `o4-mini` call the OpenAI API directly (using `OPENAI_API_KEY`),
 and `gpt-oss-120b` runs against a local server. Run all commands from the repository root.
 
-The benchmark scenarios are hosted as a Hugging Face dataset and downloaded automatically (see
-[Run the CLI](#run-the-cli)); `HF_TOKEN` is needed only for that download — not for local runs.
-Get a read token at <https://huggingface.co/settings/tokens> (or run `huggingface-cli login`).
+The benchmark scenarios are hosted as a **public** Hugging Face dataset and downloaded
+automatically on first use (see [Run the CLI](#run-the-cli)). No token and no login are needed.
 
 ---
 
@@ -80,14 +78,18 @@ sidebar, then hit **▶ Run Agent Task**. The API key auto-fills from `$OPENROUT
 `evaluation_<scenario>.json` beside it.
 
 **By default — with no `-d` or `--scenarios-folder` — the runner downloads the PiSAs benchmark from
-Hugging Face** (cached locally; needs `HF_TOKEN`) and runs one task, selected by `--task`
-(default `JIRA_allocation`; also `meeting_allocation`, `severity_classification`), writing under
-`results/PiSAs/<task>/<scenario>/`:
+Hugging Face** (public, cached locally) and runs one task, selected by `--task`. Task names are read
+from the dataset itself, so `python run_pipeline.py --list-tasks` always shows the current set.
+Output goes under `results/PiSAs/<task>/<scenario>/`:
 
 ```bash
 python run_pipeline.py -s centralized --agent-llm anthropic/claude-sonnet-4-6 --private-memory --shared-memory
 python run_pipeline.py -s centralized --agent-llm anthropic/claude-sonnet-4-6 --task meeting_allocation
+python run_pipeline.py --list-tasks
 ```
+
+`run_evaluation.py --task <name>` resolves the same folder, so judging a released task needs only
+`--task` and `--results-path`.
 
 To run **local** scenarios instead, pass an explicit path with `-d` (single) or `--scenarios-folder`
 (batch):
@@ -113,11 +115,19 @@ up a local SGLang server for open models).
 **Key flags** (run either script with `-h` for the rest):
 
 - `run_pipeline.py` — `-s {single,centralized,decentralized}`, `--agent-llm` (required),
-  `--privacy-level {None,Low,Medium,High}` (default `High`), the memory flags above. Eval reads the
-  rest of the config back from the pipeline JSON.
-- `run_evaluation.py` — `--judge-llm` (default `gemini-2.5-pro`) plus the audit switches that select
-  which surfaces to score: `--output-audit` (V_G, C, U — *on*), `--agent-audit` (V_A — off),
-  `--memory-audit` (V_PMem, V_SMem — off).
+  `--privacy-level {None,Low,Medium,High}` (default `High`), the memory flags above,
+  `--hide-task-from-peers` (colleague agents get no task text; only the executor's does),
+  `--max-output-tokens` (default 16384 — a reasoning model given too small a budget returns empty
+  turns, which truncate a run; such runs are marked `degraded` in the pipeline JSON), and
+  `--legacy-single-gather` (restores the paper's behaviour, where the privacy instruction did not
+  reach the single-agent gather prompt). Eval reads the rest of the config back from the pipeline
+  JSON.
+- `run_evaluation.py` — `--judge-llm` (default `gemini-2.5-pro`), `--judge-mode {chain,fact}`,
+  `--verifier-max-tokens` (default 1024), `--no-roster-in-judges`, plus the audit switches that
+  select which surfaces to score: `--output-audit` (V_G, C, U — *on*), `--output-leak` (V_out —
+  *on*), `--agent-audit` (V_A — off), `--memory-audit` (V_PMem, V_SMem — off).
+- `aggregate_results.py` — `--mode {any_k,worst,mean,all}`, `--per-scenario FILE`,
+  `--exclude-degraded`, and a repeatable `--results-path` that pools several folders into one table.
 
 ---
 
@@ -125,12 +135,21 @@ up a local SGLang server for open models).
 
 Violations use a two-stage **extract → verify** pipeline: a lenient judge flags candidate values
 *without* the ground truth, then a 3-model verifier committee (each given the ground truth) votes,
-and a majority confirms each violation. Completeness uses a single ground-truth-aware judge with a
-verbatim string-match guard against ground-truth leakage.
+and a majority of the votes cast — never fewer than two — confirms each violation. A verifier that
+errors or returns empty abstains rather than agreeing; when fewer than two verifiers answer, the
+item is left `uncertain` and the scenario's `verification.degraded` flag is set.
+Completeness uses a single ground-truth-aware judge with a verbatim string-match guard against
+ground-truth leakage. Every judge prompt carries the organizational roster (name → role), so a fact
+stated by role is matched to the same fact recorded by name.
+
+`--judge-mode fact` swaps the chain for one fact-given call per (attribute, surface), gated on the
+judge quoting the passage it relied on — no verifier committee, cheap enough for an open-weight
+judge (κ 0.77 against human annotators with gpt-oss-120b, vs κ 0.72 for the chain).
 
 **Appropriateness** — inappropriate attributes that get disclosed:
 
-> **V_G** (gathered-info summary) · **V_A2A** (agent-to-agent messages) · **V_appr = V_G ∪ V_A2A**
+> **V_G** (gathered-info summary) · **V_A2A** (agent-to-agent messages) · **V_out** (final answer)
+> · **V_appr = V_G ∪ V_A2A** (the paper writes this **V_C**)
 
 **Visibility** — attributes that reach an agent who should not access them:
 
@@ -140,17 +159,21 @@ verbatim string-match guard against ground-truth leakage.
 **Completeness (C)** — fraction of *appropriate* attributes present in the gathered summary.
 **Utility (U)** — binary: does the implied decision match the oracle?
 
-Rates are normalized by the inappropriate-attribute count (appropriateness) or the count of
-attributes hidden from ≥1 agent (visibility). Across K runs, violation rates take the **any-K
-union** while completeness and utility take the **per-run mean**.
+**V_any** — everything that leaked, over the union universe (inappropriate ∪ hidden).
+**V_S** — share of runs in which something inappropriate leaked on any surface.
+
+Rates are normalized by the inappropriate-attribute count (appropriateness), the count of
+attributes hidden from ≥1 agent (visibility), or their union (V_any). Across K runs, violation
+rates take the **any-K union** while completeness and utility take the **per-run mean**; everything
+is then averaged over scenarios and reported as **mean ± standard error**.
 
 ---
 
 ## Data & outputs
 
 The full benchmark (all task families and their scenarios) lives in the PiSAs Hugging Face dataset
-and is downloaded on demand. The local `data/` folder keeps a single sample scenario so the demo and
-local runs work out of the box. Either way, each scenario folder holds four files:
+and is downloaded on demand. The local `data/` folder keeps two sample scenarios — one from the
+original JIRA task and one seed-generated bundle — so the demo and local runs work out of the box. Either way, each scenario folder holds four files:
 
 | File | Contents |
 |---|---|
@@ -171,6 +194,8 @@ re-running) and an `evaluation_<id>.json` with the scored metrics above.
 app.py                 # Streamlit demo (Single / Decentralized / Centralized)
 agents.py              # Agent classes, topology runners, prompt templates, memory
 judges.py              # LLM judges + verifier committee
+fact_judge.py          # fact-given judge (--judge-mode fact)
+benchmark.py           # resolve benchmark tasks from the Hugging Face dataset
 run_pipeline.py        # CLI: orchestrate a run  → pipeline_*.json
 run_evaluation.py      # CLI: judge a run        → evaluation_*.json
 aggregate_results.py   # Roll per-scenario results into summary tables

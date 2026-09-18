@@ -31,6 +31,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(__file__))
 
+from benchmark import PISAS_HF_REPO, print_tasks, resolve_task
+
 log = logging.getLogger("pipeline")
 log.setLevel(logging.DEBUG)
 _sh = logging.StreamHandler(sys.stdout)
@@ -41,23 +43,6 @@ log.addHandler(_sh)
 _DATA_ROOT = os.path.join(os.path.dirname(__file__), "data")
 ARCH_LABELS = {"decentralized": "Decentralized", "single": "Single", "centralized": "Centralized"}
 W = 72
-
-# Hugging Face dataset holding the full PiSAs benchmark. Downloaded by default (to
-# the HF cache) when no local scenario/folder is given. Private during review; the
-# repo id stays the same once it goes public.
-PISAS_HF_REPO = "ServiceNow/PiSAs"
-
-_HF_AUTH_HELP = (
-    "Can't access the private PiSAs dataset on Hugging Face — no valid HF token found.\n"
-    "The benchmark is private, so you need a Hugging Face token with read access.\n"
-    "  1. Create a read token:  https://huggingface.co/settings/tokens\n"
-    "  2. Make it available, either:\n"
-    "       huggingface-cli login          (paste the token), or\n"
-    "       export HF_TOKEN=hf_xxxxx        (e.g. add to ~/.bashrc)\n"
-    "  3. Re-run.\n"
-    "Or skip Hugging Face and use local data:  --scenarios-folder <path>  (or -d <scenario>)"
-)
-
 
 def _require(value, message):
     """Exit with a clear message if a required value (e.g. an API key) is missing."""
@@ -101,19 +86,6 @@ def _query_key_usage(api_key: str):
         return None
 
 
-# ── Hugging Face benchmark download ───────────────────────────────────────────
-
-def _download_benchmark() -> str:
-    """Download the full PiSAs benchmark from Hugging Face (cached) and return its path."""
-    from huggingface_hub import snapshot_download, get_token
-    _require(get_token(), _HF_AUTH_HELP)
-    log.info("  Downloading PiSAs benchmark from Hugging Face…")
-    try:
-        return snapshot_download(PISAS_HF_REPO, repo_type="dataset")
-    except Exception as e:
-        _require(False, f"{_HF_AUTH_HELP}\n  Underlying error: {e}")
-
-
 # ── Single-scenario orchestration ─────────────────────────────────────────────
 
 def run_single(args, api_key):
@@ -149,10 +121,16 @@ def run_single(args, api_key):
     arch_label = ARCH_LABELS[args.system]
 
     # Imported here (not at module top) so batch mode's parent process stays light.
+    import agents as _agents_mod
     from agents import (build_siloed_system, run_task_token_passing,
                         run_task_truly_centralized, build_team_system, load_artifacts_team,
                         preload_artifacts_with_memory, PRIVACY_INSTRUCTIONS,
-                        MEMORY_VISIBILITY_INSTRUCTIONS)
+                        MEMORY_VISIBILITY_INSTRUCTIONS, set_max_output_tokens,
+                        reset_empty_generations)
+    _agents_mod.PEER_TASK_TEXT = not args.hide_task_from_peers        # --hide-task-from-peers
+    _agents_mod.PRIVACY_IN_SINGLE_GATHER = not args.legacy_single_gather
+    set_max_output_tokens(args.max_output_tokens)
+    reset_empty_generations()
 
     log.info("═" * W)
     log.info("  ⬡ PiSAs  —  Pipeline")
@@ -266,6 +244,9 @@ def run_single(args, api_key):
             "shared_memory_writer": args.shared_memory_writer,
             "memory_cleanup":       args.memory_cleanup,
             "privacy_level":        args.privacy_level,
+            "hide_task_from_peers": args.hide_task_from_peers,
+            "privacy_in_single_gather": not args.legacy_single_gather,
+            "max_output_tokens":    args.max_output_tokens,
         },
         "task_description":              scenario["task"]["description"],
         "ground_truth": {
@@ -288,6 +269,11 @@ def run_single(args, api_key):
         "shared_memory_rendered":        shared_memory.render() if shared_memory else None,
         "n_a2a":                         n_a2a,
         "pipeline_time":                 pipeline_time,
+        # True when at least one agent turn came back empty after every retry: the run
+        # completed but part of it is missing. aggregate_results.py --exclude-degraded
+        # drops these instead of scoring them as a quiet, cautious run.
+        "degraded":                      _agents_mod.EMPTY_GENERATIONS > 0,
+        "n_empty_generations":           _agents_mod.EMPTY_GENERATIONS,
     }
 
     with open(run_path, "w") as f:
@@ -314,6 +300,11 @@ def _pipeline_argv(args, api_key) -> list:
     if args.memory_cleanup:
         argv.append("--memory-cleanup")
     argv += ["--privacy-level", args.privacy_level]
+    argv += ["--max-output-tokens", str(args.max_output_tokens)]
+    if args.hide_task_from_peers:
+        argv.append("--hide-task-from-peers")
+    if args.legacy_single_gather:
+        argv.append("--legacy-single-gather")
     if api_key:
         argv += ["--api-key", api_key]
     return argv
@@ -435,14 +426,15 @@ def run_batch(args, api_key):
 def build_parser():
     p = argparse.ArgumentParser(
         description="PiSAs pipeline runner — orchestration only, no judging. "
-                    "By default downloads the PiSAs benchmark from Hugging Face and runs one task "
-                    "(--task, default JIRA_allocation; needs an HF token). Use -d/-o for a single "
-                    "local scenario, or --scenarios-folder/--results-path for a local batch.",
+                    "By default downloads the public PiSAs benchmark from Hugging Face (no token "
+                    "needed) and runs one task (--task, default JIRA_allocation; --list-tasks shows "
+                    "them all). Use -d/-o for a single local scenario, or "
+                    "--scenarios-folder/--results-path for a local batch of your own scenarios.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     # Architecture + model config (shared).
     p.add_argument("-s", "--system", choices=["decentralized", "single", "centralized"], default="decentralized", help="Agent architecture.")
-    p.add_argument("--agent-llm", required=True, metavar="MODEL", help="Agent backbone LLM.")
+    p.add_argument("--agent-llm", default=None, metavar="MODEL", help="Agent backbone LLM. Required except with --list-tasks.")
     p.add_argument("--coordinator-llm", default=None, metavar="MODEL",
                    help="LLM for the TC coordinator; falls back to --agent-llm if unset.")
     p.add_argument("--coordinator-thinking", action="store_true", default=False,
@@ -455,12 +447,28 @@ def build_parser():
     p.add_argument("--shared-memory-writer", choices=["all", "executor"], default="all")
     p.add_argument("--memory-cleanup", action="store_true", default=False)
     p.add_argument("--privacy-level", choices=["None", "Low", "Medium", "High"], default="High")
+    p.add_argument("--hide-task-from-peers", action="store_true", default=False,
+                   help="Colleague agents do not get the task text in their prompts; only the "
+                        "executor's agent does (default: every agent sees the task).")
+    p.add_argument("--legacy-single-gather", action="store_true", default=False,
+                   help="Reproduce the paper's single-agent runs, where the privacy instruction "
+                        "did not reach the single-agent gather prompt (it now does by default, so "
+                        "--privacy-level means the same thing in all three systems).")
+    p.add_argument("--max-output-tokens", type=int, default=16384, metavar="N",
+                   help="Output budget per agent turn. Too small a budget makes reasoning models "
+                        "return empty turns, which silently truncate a run.")
     p.add_argument("--api-key", default=None, metavar="KEY",
                    help="OpenRouter API key (overrides OPENROUTER_API_KEY).")
     # Hugging Face benchmark (used when no local scenario/folder is given).
-    p.add_argument("--task", default="JIRA_allocation",
-                   choices=["JIRA_allocation", "meeting_allocation", "severity_classification"],
-                   help="Which PiSAs task to download & run from Hugging Face.")
+    p.add_argument("--task", default="JIRA_allocation", metavar="NAME",
+                   help="Which PiSAs task to run from the Hugging Face dataset (public, no token "
+                        "needed). Names are read from the dataset itself — see --list-tasks.")
+    p.add_argument("--list-tasks", action="store_true", default=False,
+                   help="Print the tasks available in the dataset (with scenario counts) and exit.")
+    p.add_argument("--hf-repo", default=PISAS_HF_REPO, metavar="REPO_ID",
+                   help="Hugging Face dataset to read the benchmark from.")
+    p.add_argument("--hf-revision", default=None, metavar="REV",
+                   help="Pin the dataset to a branch, tag or commit sha.")
     # Single mode.
     p.add_argument("-d", "--scenario", default=None, metavar="FOLDER",
                    help="[single] Scenario folder under data/, or a direct path.")
@@ -480,16 +488,17 @@ def build_parser():
 
 def main():
     args = build_parser().parse_args()
+    if args.list_tasks:
+        print_tasks(repo_id=args.hf_repo, revision=args.hf_revision)
+        return
+    _require(args.agent_llm, "--agent-llm is required.")
     api_key = args.api_key or os.getenv("OPENROUTER_API_KEY", "")
     _require(api_key, "No API key. Set OPENROUTER_API_KEY or pass --api-key.")
 
     # Default data source: the chosen --task of the PiSAs benchmark from Hugging Face.
     # Skipped when the user points at local data with -d/--scenario or --scenarios-folder.
     if not (args.scenario or args.scenarios_folder):
-        benchmark_root = Path(_download_benchmark())
-        task_dir = benchmark_root / args.task
-        _require(task_dir.is_dir(), f"Task {args.task!r} not found in the benchmark at {benchmark_root}.")
-        args.scenarios_folder = str(task_dir)
+        args.scenarios_folder = str(resolve_task(args.task, repo_id=args.hf_repo, revision=args.hf_revision))
         args.results_path = args.results_path or "results/PiSAs"
         run_batch(args, api_key)
         return

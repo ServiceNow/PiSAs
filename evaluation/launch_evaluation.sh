@@ -5,7 +5,9 @@
 #
 # Usage:
 #   bash launch_evaluation.sh --model <MODEL> --systems decentralized,centralized,single
-#     [--privacy-levels None,Medium,High]   (default: None)
+#     [--privacy-levels None,Medium,High]   (default: High — must match the pipeline run)
+#     [--scenarios-folder PATH]             (default: data)
+#     [--results-dir PATH]                  (default: results/PiSAs)
 #     [--memory-modes no,shared,private,both]  (default: no)
 #     [--shared-memory-writer all|executor]    must match the pipeline run (default: all)
 #     [--memory-cleanup]                        must match the pipeline run
@@ -28,7 +30,7 @@ set -e
 
 MODEL=""
 SYSTEMS=""
-PRIVACY_LEVELS="None"
+PRIVACY_LEVELS="High"
 MEMORY_MODES="no"
 RUN_INDEX="None"
 AGENT_AUDIT=false
@@ -36,6 +38,8 @@ MEMORY_AUDIT=false
 SHARED_MEMORY_WRITER="all"
 MEMORY_CLEANUP=false
 WORKERS=32
+DATA_DIR="data"
+RESULTS_DIR="results/PiSAs"
 JUDGE_LLM="google/gemini-2.5-pro"
 MEMORY_JUDGE_LLM="google/gemini-2.5-flash"
 VERIFIER_1="anthropic/claude-haiku-4-5"
@@ -59,6 +63,7 @@ while [[ $# -gt 0 ]]; do
         --memory-judge-llm) MEMORY_JUDGE_LLM="$2"; shift 2 ;;
         --api-key)          API_KEY="$2";          shift 2 ;;
         --results-dir)      RESULTS_DIR="$2";      shift 2 ;;
+        --scenarios-folder) DATA_DIR="$2";         shift 2 ;;
         *) echo "Unknown arg: $1"; exit 1 ;;
     esac
 done
@@ -73,8 +78,8 @@ fi
 # ── Config ─────────────────────────────────────────────────────────────────────
 PYTHON="${PYTHON:-python3}"
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
-DATA_DIR="data"
-RESULTS_DIR="${RESULTS_DIR:-results/paper/jira}"   # honor --results-dir if passed
+DATA_DIR="${DATA_DIR:-data}"                       # honor --scenarios-folder if passed
+RESULTS_DIR="${RESULTS_DIR:-results/PiSAs}"        # honor --results-dir if passed
 
 MODEL_SHORT=$(echo "$MODEL" | sed 's|.*/||' | tr '[:upper:]' '[:lower:]' | tr '.-' '__')
 
