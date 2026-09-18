@@ -43,42 +43,19 @@ Usage:
 import argparse
 import csv
 import json
-import math
-import statistics as st
+
+
 import sys
 from collections import defaultdict
 from pathlib import Path
 
-# metric -> (json path to its sub-dict, key holding the denominator)
-# Appropriateness violations use n_inapp; visibility violations the hidden-from count;
-# V_any the union universe of both.
-VIOLATION_METRICS = {
-    "V_G":    (["V_G"],          "n_inapp"),
-    "V_A2A":  (["V_A2A"],        "n_inapp"),
-    "V_out":  (["V_out"],        "n_inapp"),
-    "V_appr": (["V_appr"],       "n_inapp"),
-    "V_A":    (["V_A", "total"], "n_potential"),
-    "V_PMem": (["V_PMem"],       "n_hidden"),
-    "V_SMem": (["V_SMem"],       "n_hidden"),
-    "V_vis":  (["V_vis"],        "n_potential"),
-    "V_any":  (["V_any"],        "n_universe"),
-}
-# Display order for the report.
-ROW_ORDER = ["C", "U", "V_G", "V_A2A", "V_out", "V_appr", "V_A", "V_PMem", "V_SMem",
-             "V_vis", "V_any", "V_S", "F", "#A2A"]
+# Every metric definition — the registry, the universes and the aggregation — lives in
+# metrics.py, so the CLI, this aggregator and the Streamlit demo cannot drift apart.
+from metrics import ROW_ORDER, aggregate, dig as _dig
 
 # A gathered summary longer than this is almost always a model dumping its raw reasoning
 # into the gather channel rather than a list of facts.
 GATHER_BLOAT_CHARS = 20000
-
-
-def _dig(d, path):
-    """Follow a list of keys; return None if any level is missing/None."""
-    for k in path:
-        if not isinstance(d, dict):
-            return None
-        d = d.get(k)
-    return d
 
 
 def _scenario_run(fname: str):
@@ -134,74 +111,6 @@ def load_runs(results_paths, exclude_degraded=False):
                 continue
             runs[scen].append(ev)
     return runs, health
-
-
-def _per_run_rate(sub, denom_key):
-    """(flagged set, denominator, rate) for one run's metric sub-dict, or Nones if absent."""
-    if not isinstance(sub, dict):
-        return None, None, None
-    flagged = set(sub.get("flagged", []) or [])
-    denom = sub.get(denom_key) or 0
-    rate = (len(flagged) / denom) if denom else 0.0
-    return flagged, denom, rate
-
-
-def per_scenario_violation(runs, path, denom_key, mode):
-    """One scenario's rate for one violation metric, or None when nothing measured it."""
-    subs = [_dig(r, path) for r in runs]
-    present = [_per_run_rate(s, denom_key) for s in subs if isinstance(s, dict)]
-    if not present:
-        return None
-    if mode == "any_k":
-        union = set().union(*(f for f, _, _ in present))
-        denom = next((d for _, d, _ in present if d), 0)
-        return len(union) / denom if denom else 0.0
-    if mode == "worst":
-        return max(r for _, _, r in present)
-    return sum(r for _, _, r in present) / len(present)
-
-
-def per_scenario_scalars(runs):
-    """C, U, V_S, F, #A2A for one scenario (run means / run shares)."""
-    def _mean(xs):
-        return st.mean(xs) if xs else None
-    comps = [c for c in (_dig(r, ["completeness", "rate"]) for r in runs) if c is not None]
-    utils = [u for u in (_dig(r, ["utility", "score"]) for r in runs) if u is not None]
-    a2as = [n for n in (_dig(r, ["efficiency", "rounds"]) for r in runs) if n is not None]
-
-    fails, leaks = [], []
-    for r in runs:
-        vappr = _dig(r, ["V_appr", "flagged"])
-        if vappr is not None:
-            fails.append(1 if len(vappr) > 0 else 0)
-        # V_S: did anything inappropriate leak on any surface in this run?
-        surfaces = [_dig(r, [m, "flagged"]) for m in ("V_G", "V_A2A", "V_out")]
-        if any(s is not None for s in surfaces):
-            leaks.append(1 if any(s for s in surfaces if s) else 0)
-    return {"C": _mean(comps), "U": _mean(utils), "F": _mean(fails),
-            "V_S": _mean(leaks), "#A2A": _mean(a2as)}
-
-
-def compute(runs_by_scenario, mode):
-    """Per-scenario rows + mean/SE over scenarios for every metric."""
-    rows = []
-    for scen in sorted(runs_by_scenario):
-        runs = runs_by_scenario[scen]
-        row = {"scenario": scen, "n_runs": len(runs)}
-        row.update(per_scenario_scalars(runs))
-        for name, (path, denom_key) in VIOLATION_METRICS.items():
-            row[name] = per_scenario_violation(runs, path, denom_key, mode)
-        rows.append(row)
-
-    summary = {}
-    for name in ROW_ORDER:
-        xs = [r[name] for r in rows if r.get(name) is not None]
-        if not xs:
-            summary[name] = {"mean": None, "se": None, "n": 0}
-            continue
-        se = st.stdev(xs) / math.sqrt(len(xs)) if len(xs) > 1 else 0.0
-        summary[name] = {"mean": st.mean(xs), "se": se, "n": len(xs)}
-    return summary, rows
 
 
 def _fmt(name, cell):
@@ -263,7 +172,7 @@ def main():
     modes = ["any_k", "worst", "mean"] if args.mode == "all" else [args.mode]
     summaries, rows_by_mode = {}, {}
     for m in modes:
-        summaries[m], rows_by_mode[m] = compute(runs_by_scenario, m)
+        summaries[m], rows_by_mode[m] = aggregate(runs_by_scenario, m)
 
     label = results_paths[0].name if len(results_paths) == 1 else f"{len(results_paths)} folders pooled"
     print("═" * 64)

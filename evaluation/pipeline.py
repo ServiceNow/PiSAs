@@ -22,11 +22,10 @@ except Exception:
 
 
 # Model → provider registry. Lists only the exceptions to the OpenRouter default,
-# so bare names route without a prefix: "gpt-5" → native OpenAI, "gpt-oss-120b" →
-# local server. An explicit "local/<model>" prefix still works (back-compat).
-# Any model not listed here falls back to OpenRouter.
+# so bare names route without a prefix: "gpt-5" → native OpenAI. Any model not listed
+# here goes to OpenRouter, which is how open-weight backbones are reached too
+# (e.g. "openai/gpt-oss-120b", "qwen/qwen3-235b-a22b").
 MODEL_PROVIDER = {
-    "gpt-oss-120b": "local",
     "gpt-5":        "openai",
     "gpt-5.5":      "openai",
     "o4-mini":      "openai",
@@ -34,25 +33,7 @@ MODEL_PROVIDER = {
 
 
 def make_openrouter_kwargs(model_name: str, api_key: str, temperature: float = 0.7) -> Dict:
-    # Resolve provider: explicit local/ prefix wins, else the registry, else OpenRouter.
-    if model_name.startswith("local/"):
-        provider, alias = "local", model_name.split("/", 1)[1]
-    else:
-        provider, alias = MODEL_PROVIDER.get(model_name, "openrouter"), model_name
-
-    if provider == "local":
-        kwargs = {
-            "model": f"openai/{alias}",
-            "api_key": os.environ.get("LOCAL_MODEL_API_KEY", "sk-local"),
-            "api_base": os.environ.get("LOCAL_MODEL_API_BASE", "http://localhost:8003/v1"),
-            "temperature": temperature,
-            "num_retries": 3,
-            "timeout": 600,
-        }
-        extra_body_raw = os.environ.get("LOCAL_MODEL_EXTRA_BODY")
-        if extra_body_raw:
-            kwargs["extra_body"] = json.loads(extra_body_raw)
-        return kwargs
+    provider, alias = MODEL_PROVIDER.get(model_name, "openrouter"), model_name
 
     if provider == "openai":
         # Native OpenAI API (api.openai.com), keyed by OPENAI_API_KEY. OpenAI

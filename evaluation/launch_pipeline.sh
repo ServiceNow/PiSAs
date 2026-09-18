@@ -1,14 +1,6 @@
 #!/bin/bash
 # Launch pipeline runs across systems/models/privacy/memory combos.
-# For local models (e.g. gpt-oss), spins up an SGLang server on a GPU cluster first.
-# The --local block targets a generic cluster job scheduler; override these env vars
-# (or edit them) for your environment:
-#   SCHED_CLI        scheduler CLI            (default: CHANGE_ME-sched)
-#   SCHED_ACCOUNT    compute account
-#   SCHED_DATA_MOUNT data volume to mount at /mnt/home
-#   SGLANG_IMAGE    container image with SGLang
-#   PYTHON          local python            (default: python3)
-#   REMOTE_PYTHON   python inside the container (default: python)
+#   PYTHON          python interpreter to use (default: python3)
 #
 # Usage:
 #   bash launch_pipeline.sh --model <MODEL> --systems decentralized,centralized,single
@@ -18,27 +10,20 @@
 #     [--run-index 0,1,2]                      (default: 0)
 #     [--api-key KEY]                          (default: $OPENROUTER_API_KEY)
 #     [--coordinator-thinking]                 (TC only)
-#     [--local] [--port N] [--gpu N]
 #
 # Examples:
 #   bash launch_pipeline.sh --model anthropic/claude-sonnet-4-6 \
 #     --systems centralized --privacy-levels High --memory-modes no,shared --run-index 0,1,2
-#
-#   bash launch_pipeline.sh --model openai/gpt-oss-120b --local --gpu 2 \
-#     --systems decentralized,centralized --privacy-levels None,High --run-index 0
 #
 # Run from: the repository root (where this script lives).
 
 set -e
 
 MODEL=""
-PORT=8003
-GPU=8
 RUN_INDICES="0"
 SYSTEMS=""
 PRIVACY_LEVELS="High"
 MEMORY_MODES="no"
-IS_LOCAL=false
 API_KEY=""
 COORDINATOR_THINKING=false
 WORKERS=32
@@ -50,11 +35,8 @@ MEMORY_CLEANUP=false
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --model)                MODEL="$2";                  shift 2 ;;
-        --port)                 PORT="$2";                   shift 2 ;;
-        --gpu)                  GPU="$2";                    shift 2 ;;
         --run-index)            RUN_INDICES="$2";            shift 2 ;;
         --memory-modes)         MEMORY_MODES="$2";           shift 2 ;;
-        --local)                IS_LOCAL=true;               shift ;;
         --systems)              SYSTEMS="$2";                shift 2 ;;
         --privacy-levels)       PRIVACY_LEVELS="$2";         shift 2 ;;
         --api-key)              API_KEY="$2";                shift 2 ;;
@@ -76,77 +58,20 @@ if [[ -z "$SYSTEMS" ]]; then
 fi
 
 # ── Config ─────────────────────────────────────────────────────────────────────
-SCHED="${SCHED_CLI:-CHANGE_ME-sched}"
-ACCOUNT="${SCHED_ACCOUNT:-CHANGE_ME.account}"
-SGLANG_PORT=$PORT
 PYTHON="${PYTHON:-python3}"
 BASE_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 MODEL_SHORT=$(echo "$MODEL" | sed 's|.*/||' | tr '[:upper:]' '[:lower:]' | tr '.-' '__')
 
-if $IS_LOCAL; then
-    AGENT_LLM="local/$(echo "$MODEL" | sed 's|.*/||')"
-else
-    AGENT_LLM="$MODEL"
-fi
+AGENT_LLM="$MODEL"
 
 log()         { echo "[$(date '+%H:%M:%S')] $*"; }
 log_section() { echo ""; echo "════════════════════════════════════════════════"; echo "  $*"; echo "════════════════════════════════════════════════"; }
 
 LAUNCH_START=$(date +%s)
 
-# ── SGLang setup (local models only) ──────────────────────────────────────────
-if $IS_LOCAL; then
-    REASONING_PARSER_FLAG=""
-    [[ "$MODEL" == *"gpt-oss"* ]] && REASONING_PARSER_FLAG="--reasoning-parser gpt-oss"
-
-    log_section "STEP 1/4 — Submitting SGLang server job (${GPU}x H100)"
-    JOB_ID=$($SCHED job new \
-        --account "$ACCOUNT" \
-        --name "sglang_p${SGLANG_PORT}_$(date +%Y%m%d_%H%M%S)" \
-        --cpu 32 --gpu $GPU --mem 640 --gpu-mem 80 --gpu-model-filter H100 \
-        --image "${SGLANG_IMAGE:-CHANGE_ME/sglang-image}" \
-        --data "${SCHED_DATA_MOUNT:-CHANGE_ME.data_mount}:/mnt/home:rw" \
-        --env HOME=/mnt/home --env HF_HOME=/mnt/home/.cache/huggingface \
-        --preemptable --restartable --tunnel \
-        --fields id --no-header \
-        -- bash -c "
-            export HF_HOME=/mnt/home/.cache/huggingface
-            exec ${REMOTE_PYTHON:-python} -m sglang.launch_server \
-                --model-path $MODEL --host 0.0.0.0 --port $SGLANG_PORT \
-                --tp $GPU --mem-fraction-static 0.85 $REASONING_PARSER_FLAG \
-                --disable-cuda-graph --trust-remote-code
-        ")
-    log "Job submitted — ID: $JOB_ID"
-
-    log_section "STEP 2/4 — Waiting for RUNNING state"
-    for i in $(seq 1 60); do
-        STATE=$($SCHED job get "$JOB_ID" --fields state --no-header 2>/dev/null)
-        log "[$i/60] Job state: $STATE"
-        [ "$STATE" = "RUNNING" ] && break
-        sleep 15
-    done
-    [ "$STATE" != "RUNNING" ] && { log "ERROR: job not RUNNING after 15 min."; exit 1; }
-
-    log_section "STEP 3/4 — Port-forward localhost:$SGLANG_PORT → job:$SGLANG_PORT"
-    $SCHED job port-forward "$JOB_ID" "$SGLANG_PORT" &
-    PF_PID=$!
-    trap "kill $PF_PID 2>/dev/null; $SCHED job kill $JOB_ID > /dev/null 2>&1 || true" EXIT
-    sleep 3
-
-    log "Waiting for SGLang to be ready…"
-    for i in $(seq 1 120); do
-        curl -s "http://localhost:$SGLANG_PORT/v1/models" > /dev/null 2>&1 && break
-        log "[$i/120] not ready — waiting 10s…"; sleep 10
-    done
-    curl -s "http://localhost:$SGLANG_PORT/v1/models" > /dev/null 2>&1 || { log "ERROR: SGLang not ready."; exit 1; }
-
-    export LOCAL_MODEL_API_BASE="http://localhost:$SGLANG_PORT/v1"
-    export LOCAL_MODEL_API_KEY="sk-local"
-fi
-
 # ── Launch pipeline grid ───────────────────────────────────────────────────────
-log_section "STEP 4/4 — Launching pipeline grid | systems=$SYSTEMS | privacy=$PRIVACY_LEVELS | memory=$MEMORY_MODES | runs=$RUN_INDICES"
+log_section "Launching pipeline grid | systems=$SYSTEMS | privacy=$PRIVACY_LEVELS | memory=$MEMORY_MODES | runs=$RUN_INDICES"
 
 cd "$BASE_DIR"
 IFS=',' read -ra SYSTEM_LIST  <<< "$SYSTEMS"
@@ -223,11 +148,6 @@ for i in "${!PIDS[@]}"; do
 done
 
 [[ $FAILED -gt 0 ]] && log "WARNING: $FAILED combo(s) failed"
-
-if $IS_LOCAL; then
-    log "Killing SGLang job $JOB_ID…"
-    $SCHED job kill "$JOB_ID" > /dev/null 2>&1 && log "Job killed." || log "WARNING: could not kill job $JOB_ID"
-fi
 
 ELAPSED=$(( $(date +%s) - LAUNCH_START ))
 log_section "ALL DONE — $FAILED failed | $(( ELAPSED/3600 ))h $(( (ELAPSED%3600)/60 ))m $(( ELAPSED%60 ))s"

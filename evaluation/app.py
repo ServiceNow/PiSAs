@@ -55,7 +55,6 @@ def build_cast_context(scenario: dict) -> str:
 
 
 MODELS = [
-    "local/gpt-oss-120b",
     "anthropic/claude-opus-4-7",
     "anthropic/claude-sonnet-4-6",
     "anthropic/claude-haiku-4-5",
@@ -1319,6 +1318,8 @@ if use_team_agent:
         # Single agent has no agent-to-agent communication → no V_A2A.
         render_results_summary(
             privacy, decision,
+            visibility_data=visibility_data,
+            appropriateness_data=appropriateness_data, utility_data=utility_data,
             n_a2a=0,
             pipeline_time=st.session_state.get("team_pipeline_time"),
         )
@@ -1399,6 +1400,7 @@ elif use_token_passing:
             render_results_summary(privacy, decision, audit_results,
                                    a2a_violation=_a2a_viol, memory_violations=mem_violations,
                                    visibility_data=visibility_data,
+                                   appropriateness_data=appropriateness_data, utility_data=utility_data,
                                    n_a2a=_n_a2a, pipeline_time=result.get("_pipeline_time"))
 
 
@@ -1519,6 +1521,7 @@ elif use_truly_centralized:
             render_results_summary(privacy, decision, audit_results,
                                    a2a_violation=_a2a_viol, memory_violations=mem_violations,
                                    visibility_data=visibility_data,
+                                   appropriateness_data=appropriateness_data, utility_data=utility_data,
                                    n_a2a=_n_a2a, pipeline_time=result.get("_pipeline_time"))
 
 

@@ -21,8 +21,9 @@ export OPENAI_API_KEY=your_key_here   # only for native OpenAI models (gpt-5, gp
 
 Model calls go through [OpenRouter](https://openrouter.ai) by default (via litellm), so any
 OpenRouter model id works for agents, judges, and verifiers. A small registry routes a few models
-elsewhere: `gpt-5`, `gpt-5.5`, and `o4-mini` call the OpenAI API directly (using `OPENAI_API_KEY`),
-and `gpt-oss-120b` runs against a local server. Run all commands from the repository root.
+elsewhere: `gpt-5`, `gpt-5.5` and `o4-mini` call the OpenAI API directly (using `OPENAI_API_KEY`).
+Open-weight backbones are reached through OpenRouter like any other model
+(`openai/gpt-oss-120b`, `qwen/qwen3-235b-a22b`, …). Run all commands from `evaluation/`.
 
 The benchmark scenarios are hosted as a **public** Hugging Face dataset and downloaded
 automatically on first use (see [Run the CLI](#run-the-cli)). No token and no login are needed.
@@ -128,6 +129,13 @@ up a local SGLang server for open models).
   *on*), `--agent-audit` (V_A — off), `--memory-audit` (V_PMem, V_SMem — off).
 - `aggregate_results.py` — `--mode {any_k,worst,mean,all}`, `--per-scenario FILE`,
   `--exclude-degraded`, and a repeatable `--results-path` that pools several folders into one table.
+- `run_benchmark.py` — the three steps above in one command, for when you just want a number.
+- `validate_scenarios.py <folder>` — structural checks on scenario bundles (attribute ids agreeing
+  across the four files, every fact carried by an artifact, visibility naming real cast members, a
+  well-posed decision). Exit code 0/1, so it fits in a Makefile; `--strict` fails on warnings too.
+
+Batch mode gives each run its own temporary directory: set `TMPDIR` to somewhere with room if
+`/tmp` is small on your machine.
 
 ---
 
@@ -199,6 +207,9 @@ benchmark.py           # resolve benchmark tasks from the Hugging Face dataset
 run_pipeline.py        # CLI: orchestrate a run  → pipeline_*.json
 run_evaluation.py      # CLI: judge a run        → evaluation_*.json
 aggregate_results.py   # Roll per-scenario results into summary tables
+run_benchmark.py       # One command: pipeline -> evaluation -> aggregation
+metrics.py             # Every metric definition — used by the evaluator, the aggregator and the demo
+validate_scenarios.py  # Check a folder of scenario bundles before spending money on it
 eval_utils.py          # Shared metric-summary rendering (used by the demo)
 launch_pipeline.sh     # Outer-loop sweep wrappers
 launch_evaluation.sh   #   (systems × privacy × memory × runs)

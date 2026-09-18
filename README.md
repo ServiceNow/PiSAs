@@ -181,6 +181,16 @@ python run_pipeline.py --list-tasks
 Downloads the dataset into the Hugging Face cache on first use and prints every task with its
 scenario count. **No Hugging Face token is required.**
 
+### The short version
+
+```bash
+python run_benchmark.py --task uas_flight_readiness --agent-llm anthropic/claude-sonnet-4-6
+```
+
+Orchestrates, judges and aggregates all three systems and prints a table for each. Everything
+below is the same thing in its three separate steps, which is what you want as soon as you need to
+re-judge without re-running, or re-aggregate without re-judging.
+
 ### Run the three systems on one task
 
 ```bash
@@ -197,6 +207,9 @@ done
 `--run-index 0,1,2` is three independent runs per scenario, as in the paper. `--workers N`
 parallelizes; `--skip-existing` resumes an interrupted batch. Each run is written as
 `results/<task>/<system>/<task>/scenario_NN/pipeline_scenario_NN_run<k>.json`.
+
+Batch mode gives every run its own temporary directory, so on a machine where `/tmp` is small or a
+tmpfs, point `TMPDIR` somewhere with room before launching a large sweep.
 
 ### Judge and aggregate
 
@@ -380,6 +393,8 @@ task-specific code anywhere in the harness.
 cd ../evaluation
 MINE=../scenario_generation/generated/uas_flight_readiness
 
+python run_benchmark.py --scenarios-folder $MINE --agent-llm $MODEL     # or, step by step:
+
 for SYSTEM in single centralized decentralized; do
   python run_pipeline.py -s $SYSTEM --agent-llm $MODEL \
       --scenarios-folder $MINE --results-path results/mine/$SYSTEM \
@@ -526,6 +541,8 @@ Two differences from the paper's own runs, both deliberate and both revertible:
 │   ├── run_pipeline.py              # orchestrate → pipeline_<scenario>_run<k>.json
 │   ├── run_evaluation.py            # judge      → evaluation_<scenario>_run<k>.json
 │   ├── aggregate_results.py         # roll up into the metrics table
+│   ├── run_benchmark.py             # all three of the above, in one command
+│   ├── metrics.py                   # every metric definition, used by all of the above
 │   ├── benchmark.py                 # resolve tasks from the Hugging Face dataset
 │   ├── agents.py                    # agent classes, topologies, prompts, memory
 │   ├── judges.py                    # extraction judges and the verifier committee

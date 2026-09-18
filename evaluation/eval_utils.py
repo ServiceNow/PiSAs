@@ -1,14 +1,15 @@
 """
 Shared evaluation display utilities for the demo (app.py).
 
-render_results_summary renders the same metrics the CLI evaluator computes and the
-paper reports, using paper notation:
-  appropriateness — V_G (gathering), V_A2A (communication), V_appr = V_G ∪ V_A2A
-  visibility      — V_A (agent context), V_PMem, V_SMem, V_vis = V_A ∪ V_PMem ∪ V_SMem
-  plus C (completeness) and U (utility).
+render_results_summary shows exactly the metrics the CLI evaluator writes: it hands the
+raw judge outputs to metrics.assemble_run — the same call run_evaluation.py makes — and
+renders metrics.summary_rows of the result. It never computes a rate of its own, so the
+demo and the CLI cannot disagree.
 """
 
 import streamlit as st
+
+import metrics
 
 UI_GREEN = "#3a8c2f"
 UI_TEXT  = "#e8e8e8"
@@ -50,81 +51,49 @@ def _dark_table(rows, key_col="Metric", val_col="Value"):
     )
 
 
+# Which section each metric belongs to, so the table reads like the paper's grouping.
+_SECTIONS = [
+    ("Task / Output", ["C", "U", "V_G", "V_A2A", "V_out", "V_appr"]),
+    ("Agent Level",   ["V_A"]),
+    ("Memory",        ["V_PMem", "V_SMem"]),
+    ("Combined",      ["V_vis", "V_any"]),
+    ("Efficiency",    ["#A2A", "Pipeline time"]),
+]
+
+
 def render_results_summary(privacy, decision, audit_results=None,
                            a2a_violation=None, memory_violations=None,
                            visibility_data=None, n_a2a=None, pipeline_time=None,
+                           output_leak=None, appropriateness_data=None, utility_data=None,
                            table_key=None):
     """Single-run metric summary, in paper notation.
 
       privacy        — judge_privacy() output (gathered-info summary): C and V_G.
+      output_leak    — V_out judge output on the final answer, when it was run.
       a2a_violation  — judge_a2a_log() output (V_A2A), or None for the single-agent system.
       audit_results  — per-agent judge_agent_knowledge() output (V_A), when agent audit is on.
       memory_violations — judge_memory_violations() output (V_PMem, V_SMem), when memory is on.
     """
-    n_inapp = privacy.get("n_inappropriate", 0)
-    n_app   = privacy.get("n_appropriate", 0)
-    util    = 1 if decision.get("correct") else 0
-    n_hidden = (sum(1 for v in visibility_data.get("attributes", {}).values() if v.get("hidden_from"))
-                if visibility_data else 0)
+    m = metrics.assemble_run(
+        privacy=privacy, decision=decision, output_leak=output_leak,
+        a2a_violation=a2a_violation, audit_results=audit_results,
+        memory_violations=memory_violations,
+        appropriateness_data=appropriateness_data, visibility_data=visibility_data,
+        utility_data=utility_data,
+    )
+    # summary_rows returns (label, value); map each label back to its metric key so the
+    # rows can be grouped into sections without the display knowing any metric's meaning.
+    key_of = {label: key for key, label in metrics.LABELS.items()}
+    produced = [(key_of.get(label, label), label, value)
+                for label, value in metrics.summary_rows(m, n_a2a=n_a2a, pipeline_time=pipeline_time)]
 
-    def _appr(n):  # appropriateness rate, denominator = inappropriate attributes
-        return f"{(n / n_inapp):.0%}  ({n} / {n_inapp} inappropriate)" if n_inapp else "—"
-
-    def _vis(n):   # visibility rate, denominator = attributes hidden from ≥1 agent
-        return f"{(n / n_hidden):.0%}  ({n} / {n_hidden} hidden)" if n_hidden else "—"
-
-    # ── Task / output ────────────────────────────────────────────────────────
-    rows = [{"__title__": "Task / Output"}]
-    rows.append({"Metric": "C — Completeness",
-                 "Value": f"{privacy.get('completeness', 0.0):.0%}  ({len(privacy.get('covered', []))} / {n_app} appropriate)" if n_app else "—"})
-    rows.append({"Metric": "U — Utility", "Value": str(util)})
-    v_g = set(privacy.get("violations", []))
-    rows.append({"Metric": "V_G — Gathering violation", "Value": _appr(len(v_g))})
-
-    # ── Communication (V_A2A) ────────────────────────────────────────────────
-    v_a2a = set(a2a_violation.get("flagged", [])) if a2a_violation else set()
-    if a2a_violation is not None:
-        rows.append({"Metric": "V_A2A — Comm. violation", "Value": _appr(len(v_a2a))})
-
-    # ── Combined appropriateness ─────────────────────────────────────────────
-    v_appr = v_g | v_a2a
-    rows.append({"Metric": "V_appr — Appropriateness (V_G ∪ V_A2A)", "Value": _appr(len(v_appr))})
-
-    # ── Agent level (V_A) ────────────────────────────────────────────────────
-    v_a = set()
-    if audit_results:
-        for audit in audit_results.values():
-            v_a.update(audit.get("violations", []))
-        rows.append({"__separator__": True})
-        rows.append({"__title__": "Agent Level"})
-        rows.append({"Metric": "V_A — Agent context", "Value": _vis(len(v_a))})
-
-    # ── Memory level (V_PMem / V_SMem) ───────────────────────────────────────
-    v_pmem = v_smem = set()
-    if memory_violations is not None:
-        pv = memory_violations.get("private_vrate")
-        sv = memory_violations.get("shared_vrate")
-        if pv is not None or sv is not None:
+    rows = []
+    for title, keys in _SECTIONS:
+        section = [(label, value) for key, label, value in produced if key in keys]
+        if not section:
+            continue
+        if rows:
             rows.append({"__separator__": True})
-            rows.append({"__title__": "Memory"})
-        if pv is not None:
-            v_pmem = set(memory_violations.get("private_union_violated", []))
-            rows.append({"Metric": "V_PMem — Private memory", "Value": _vis(len(v_pmem))})
-        if sv is not None:
-            v_smem = set((memory_violations.get("shared") or {}).get("violations", []))
-            rows.append({"Metric": "V_SMem — Shared memory", "Value": _vis(len(v_smem))})
-
-    # ── Combined visibility ──────────────────────────────────────────────────
-    if audit_results or memory_violations:
-        v_vis = v_a | v_pmem | v_smem
-        rows.append({"Metric": "V_vis — Visibility (V_A ∪ V_PMem ∪ V_SMem)", "Value": _vis(len(v_vis))})
-
-    # ── Efficiency ───────────────────────────────────────────────────────────
-    if n_a2a is not None or pipeline_time is not None:
-        rows.append({"__separator__": True})
-    if n_a2a is not None:
-        rows.append({"Metric": "# A2A messages", "Value": str(n_a2a)})
-    if pipeline_time is not None:
-        rows.append({"Metric": "Pipeline time", "Value": f"{pipeline_time:.1f}s"})
-
+        rows.append({"__title__": title})
+        rows += [{"Metric": label, "Value": value} for label, value in section]
     _dark_table(rows)
