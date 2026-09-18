@@ -1,0 +1,3 @@
+# Scenario generation needs nothing but the standard library, except for the
+# optional configuration-analysis workbook (skip it with --no-analysis-xlsx).
+openpyxl>=3.1

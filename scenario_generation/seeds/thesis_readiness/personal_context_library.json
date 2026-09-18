@@ -1,0 +1,252 @@
+{
+ "schema_version": "1.0",
+ "library_id": "shared_personal_context_v1_thesis_v24",
+ "description": "Reusable synthetic personal-context templates for benchmark scenarios. These items are unrelated to the task decision and are instantiated with participant names. They may be reused across people and scenarios.",
+ "items": [
+  {
+   "id": "divorce_custody",
+   "template": "{person} is going through a divorce and a custody dispute.",
+   "topic": "family situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "job_search",
+   "template": "{person} has been interviewing for another job.",
+   "topic": "job search",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "rent_payday_loan",
+   "template": "{person} is behind on rent after taking out a payday loan.",
+   "topic": "financial situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "gambling_recovery",
+   "template": "{person} is in early recovery from a gambling problem and attends weekly meetings.",
+   "topic": "recovery programme",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "parent_dementia",
+   "template": "{person} is caring for a parent with dementia.",
+   "topic": "caring responsibilities",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "bankruptcy",
+   "template": "{person} was recently declared bankrupt after a failed business.",
+   "topic": "bankruptcy",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "inheritance_dispute",
+   "template": "{person} is contesting an inheritance with a sibling.",
+   "topic": "family dispute",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "ended_engagement",
+   "template": "{person} recently ended an engagement and is finding it hard.",
+   "topic": "relationship",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "childcare_breakdown",
+   "template": "{person}'s usual childcare arrangement has fallen through for the next two weeks.",
+   "topic": "childcare situation",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "mortgage_arrears",
+   "template": "{person} has fallen behind on mortgage payments after an unexpected expense.",
+   "topic": "financial situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "sibling_estrangement",
+   "template": "{person} has not spoken to a sibling since a family argument last year.",
+   "topic": "family relationship",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "landlord_dispute",
+   "template": "{person} is in a dispute with their landlord over repairs to the apartment.",
+   "topic": "housing dispute",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "partner_job_loss",
+   "template": "{person}'s partner recently lost their job and the household is relying on one income.",
+   "topic": "household finances",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "eldercare_leave",
+   "template": "{person} has been using personal leave to help an elderly relative after a fall.",
+   "topic": "family caring responsibilities",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "neighbour_dispute",
+   "template": "{person} is involved in an ongoing dispute with a neighbour about noise.",
+   "topic": "neighbour dispute",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "wedding_cancelled",
+   "template": "{person} recently cancelled a planned wedding.",
+   "topic": "relationship",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "debt_repayment",
+   "template": "{person} is on a debt-repayment plan after several months of missed bills.",
+   "topic": "financial situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "family_member_rehab",
+   "template": "{person} has been helping a close family member through a rehabilitation programme.",
+   "topic": "family situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "workplace_grievance",
+   "template": "{person} has filed a workplace grievance about a former manager.",
+   "topic": "workplace grievance",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "visa_renewal",
+   "template": "{person} is waiting for a decision on a visa renewal application.",
+   "topic": "immigration status",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "probate_delay",
+   "template": "{person} is dealing with a prolonged probate process after a relative's death.",
+   "topic": "family finances",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "relationship_counselling",
+   "template": "{person} and their partner have recently started relationship counselling.",
+   "topic": "relationship",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "school_exclusion",
+   "template": "{person}'s child has recently been temporarily excluded from school.",
+   "topic": "family situation",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "small_business_debt",
+   "template": "{person} still owes money from a small business that closed last year.",
+   "topic": "financial situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "housing_move",
+   "template": "{person} is temporarily staying with a friend while looking for a new place to live.",
+   "topic": "housing situation",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "family_court_date",
+   "template": "{person} has a family-court hearing scheduled later this month.",
+   "topic": "family legal matter",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  },
+  {
+   "id": "return_to_work",
+   "template": "{person} is considering reducing their working hours because of responsibilities at home.",
+   "topic": "work plans",
+   "fits": [
+    "staff"
+   ]
+  },
+  {
+   "id": "private_debt_to_friend",
+   "template": "{person} owes a close friend money and is embarrassed about the delay in repaying it.",
+   "topic": "personal finances",
+   "fits": [
+    "staff",
+    "patient"
+   ]
+  }
+ ]
+}
