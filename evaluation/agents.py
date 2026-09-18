@@ -467,10 +467,11 @@ Make clear the response is drafted by an AI assistant on behalf of {name}.\
 PEER_TASK_TEXT = True
 
 # Whether the privacy instruction also reaches the single-agent system's gather stage.
-# True (default) makes --privacy-level mean the same thing in all three systems. Set False
-# to reproduce the paper's runs, where only the centralized/decentralized gather prompts
-# carried it and the single-agent one got it at the decision stage only.
-PRIVACY_IN_SINGLE_GATHER = True
+# False (default) reproduces the paper's runs: only the centralized and decentralized gather
+# prompts carried it, and the single-agent system got it at the decision stage only. Set True
+# to make --privacy-level mean the same thing in all three systems — a defensible choice, but
+# one that changes the single-agent results and so no longer matches the published numbers.
+PRIVACY_IN_SINGLE_GATHER = False
 
 
 def _resolve_executor_name(scenario: dict) -> str:
@@ -978,9 +979,11 @@ class TeamAgent:
         )
 
     def build_gather_prompt(self, scenario: dict, privacy_instruction: str = "") -> str:
-        # The privacy instruction must reach this gather stage too: the centralized and
-        # decentralized systems get it in theirs, so without it --privacy-level means a
-        # different thing for the single-agent system than for the other two.
+        # The paper's runs did not put the privacy instruction here — the single-agent system
+        # received it at the decision stage only, while the centralized and decentralized systems
+        # carried it through gathering. That asymmetry is real and worth knowing about, but the
+        # published results were produced with it, so reproducing them is the default.
+        # PRIVACY_IN_SINGLE_GATHER = True adopts the symmetric behaviour instead.
         pi = f"\n\n{privacy_instruction}" if (privacy_instruction and PRIVACY_IN_SINGLE_GATHER) else ""
         return TEAM_GATHER_PROMPT_TEMPLATE.format(
             people=_people_block(scenario["cast"]),
