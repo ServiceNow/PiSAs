@@ -464,7 +464,8 @@ def build_parser():
                         "inappropriate attributes, a three-model verifier committee confirms each. "
                         "fact: one call per attribute and surface that is given the fact and asked "
                         "whether the text reveals it, gated on quoted evidence — no verifiers, "
-                        "cheap enough for an open-weight judge (see the README).")
+                        "cheap enough for an open-weight judge (see the README). Applies to V_G, "
+                        "V_A2A and V_out; the per-agent audit behind V_A uses the chain either way.")
     p.add_argument("--judge-workers", type=int, default=8, metavar="N",
                    help="Parallel judge calls per surface in --judge-mode fact.")
     p.add_argument("--verifier-max-tokens", type=int, default=1024, metavar="N",

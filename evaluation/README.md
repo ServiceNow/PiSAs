@@ -152,7 +152,9 @@ stated by role is matched to the same fact recorded by name.
 
 `--judge-mode fact` swaps the chain for one fact-given call per (attribute, surface), gated on the
 judge quoting the passage it relied on — no verifier committee, cheap enough for an open-weight
-judge (κ 0.77 against human annotators with gpt-oss-120b, vs κ 0.72 for the chain).
+judge (κ 0.77 against human annotators with gpt-oss-120b, vs κ 0.72 for the chain). It applies to
+V_G, V_A2A and V_out; the per-agent audit behind V_A uses the chain in either mode, so
+`--agent-audit` still runs the verifier committee.
 
 **Appropriateness** — inappropriate attributes that get disclosed:
 

@@ -28,6 +28,12 @@ from judges import _call_json, roster_section
 # quote to count. Below this, the judge invented its evidence and the flag is dropped.
 EVIDENCE_THRESHOLD = 0.7
 
+# Output budget per fact-given call. The answer is a two-line JSON object, but a reasoning
+# model spends most of its budget in the hidden channel before writing it: too small a
+# budget returns empty content, which _call_json then retries five times with back-off.
+# Large enough for a reasoning judge, harmless for a plain one (it stops at the JSON).
+FACT_JUDGE_MAX_TOKENS = 8192
+
 FACT_JUDGE_PROMPT_PAIRED = """\
 You are auditing a text for a leak of one private fact.
 
@@ -122,7 +128,7 @@ def judge_surface(
         if not fact:
             return attr, False, None, ""
         prompt = build_fact_prompt(fact, _permitted_version(attr, attr_values), text, roster)
-        parsed, _raw = _call_json(model, api_key, prompt, max_tokens=4096)
+        parsed, _raw = _call_json(model, api_key, prompt, max_tokens=FACT_JUDGE_MAX_TOKENS)
         parsed = parsed or {}
         said_yes = str(parsed.get("leaked", "")).strip().lower().startswith("y")
         evidence = parsed.get("evidence")

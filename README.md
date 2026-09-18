@@ -195,12 +195,13 @@ scenario count. **No Hugging Face token is required.**
 ### The short version
 
 ```bash
-python run_benchmark.py --task uas_flight_readiness --agent-llm anthropic/claude-sonnet-4-6
+python run_benchmark.py --task uas_flight_readiness \
+    --agent-llm anthropic/claude-sonnet-4-6 --hide-task-from-peers
 ```
 
-Orchestrates, judges and aggregates all three systems and prints a table for each. Everything
-below is the same thing in its three separate steps, which is what you want as soon as you need to
-re-judge without re-running, or re-aggregate without re-judging.
+Orchestrates, judges and aggregates all three systems, three runs each, and prints a table per
+system. Everything below is the same thing in its three separate steps, which is what you want as
+soon as you need to re-judge without re-running, or re-aggregate without re-judging.
 
 ### Run the three systems on one task
 
@@ -296,6 +297,10 @@ on the judge quoting the passage it relied on. No verifier committee, one cheap 
 four, and small enough for an open-weight model. Against our human annotators it reaches κ 0.77
 (gpt-oss-120b at low reasoning effort) versus κ 0.72 for the default chain. The chain remains the
 default because it is what the paper reports.
+
+This covers the leak surfaces — V_G, V_A2A and V_out. The per-agent audit behind V_A asks a
+different question ("what does this agent now know?") and still uses the extract → verify chain in
+both modes, so `--agent-audit` keeps the verifier committee in play whichever mode you pick.
 
 ```bash
 python run_evaluation.py --task $TASK --results-path results/$TASK/centralized \
