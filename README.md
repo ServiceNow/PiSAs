@@ -1,7 +1,6 @@
 <p align="center">
   <a href="https://arxiv.org/abs/2607.05318"><img src="https://img.shields.io/badge/arXiv-2607.05318-b31b1b?style=for-the-badge&labelColor=032D42"></a>
   <a href="https://huggingface.co/datasets/ServiceNow/PiSAs"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Dataset-ServiceNow%2FPiSAs-FFD21E?style=for-the-badge&labelColor=032D42"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-62D84E?style=for-the-badge&labelColor=032D42"></a>
   <img src="https://img.shields.io/badge/Python-3.10-62D84E?style=for-the-badge&labelColor=032D42">
 </p>
 
@@ -551,7 +550,6 @@ Two differences from the paper's own runs, both deliberate and both revertible:
 ```text
 .
 ├── README.md
-├── LICENSE
 ├── THIRD_PARTY_LICENSES.md          # licences of the Python dependencies
 ├── evaluation/
 │   ├── README.md                    # harness reference: every flag, every output field
@@ -584,9 +582,10 @@ The scenarios are described on the
 [Hugging Face dataset card](https://huggingface.co/datasets/ServiceNow/PiSAs). Every person,
 organization and record in them is synthetic.
 
-Code in this repository is released under the Apache 2.0 licence ([`LICENSE`](LICENSE));
-third-party dependencies and their licences are listed in
-[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md).
+A licence for the code in this repository has not been declared yet. Until one is, please open an
+issue before redistributing or building on it. The licences of the third-party dependencies are
+listed in [`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md), and the dataset carries its own
+licence on its [Hugging Face card](https://huggingface.co/datasets/ServiceNow/PiSAs).
 
 ## Citation
 
